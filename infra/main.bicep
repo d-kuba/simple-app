@@ -69,18 +69,10 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-01-01' = {
   }
 }
 
-// Blob container for crash dumps
+// Blob container
 resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2023-01-01' = {
   parent: storageAccount
   name: 'default'
-}
-
-resource crashDumpsContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-01-01' = {
-  parent: blobService
-  name: 'crashdumps'
-  properties: {
-    publicAccess: 'None'
-  }
 }
 
 // Key Vault
@@ -124,17 +116,6 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
-// Generate SAS token for crash dumps storage
-var sasConfig = {
-  signedProtocol: 'https'
-  signedResourceTypes: 'sco'
-  signedPermission: 'rwdlacup'
-  signedServices: 'b'
-  signedExpiry: '2099-12-31T23:59:59Z'
-}
-var storageSasToken = listAccountSas(storageAccount.id, '2023-01-01', sasConfig).accountSasToken
-var crashDumpsSasUrl = '${storageAccount.properties.primaryEndpoints.blob}crashdumps?${storageSasToken}'
-
 // Web App
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
@@ -168,14 +149,6 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
           value: 'recommended'
         }
         {
-          name: 'DIAGNOSTICS_AZUREBLOBCONTAINERSASURL'
-          value: crashDumpsSasUrl
-        }
-        {
-          name: 'WEBSITE_CRASHDUMPS_ENABLED'
-          value: 'true'
-        }
-        {
           name: 'WEBSITE_DAAS_STORAGE_CONNECTIONSTRING'
           value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};EndpointSuffix=core.windows.net'
         }
@@ -189,12 +162,12 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   }
 }
 
-// Key Vault Secrets User role assignment for Web App
+// Key Vault Certificate User role assignment for Web App
 resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, webApp.id, 'Key Vault Secrets User')
+  name: guid(keyVault.id, webApp.id, 'Key Vault Certificate User')
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6') // Key Vault Secrets User
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'db79e9a7-68ee-4b58-9aeb-b90e7c24fcba') // Key Vault Certificate User
     principalId: webApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
@@ -206,28 +179,6 @@ resource storageRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-
   scope: storageAccount
   properties: {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'ba92f5b4-2d11-453d-a403-e96b0029c9fe') // Storage Blob Data Contributor
-    principalId: webApp.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// Storage Queue Data Contributor role assignment for Web App
-resource storageQueueRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, webApp.id, 'Storage Queue Data Contributor')
-  scope: storageAccount
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '974c5e8b-45b9-4653-ba55-5f855dd0fb88') // Storage Queue Data Contributor
-    principalId: webApp.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// Storage Table Data Contributor role assignment for Web App
-resource storageTableRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, webApp.id, 'Storage Table Data Contributor')
-  scope: storageAccount
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '0a9a7e1f-b9d0-4cc4-a60d-0319b160aaa3') // Storage Table Data Contributor
     principalId: webApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
