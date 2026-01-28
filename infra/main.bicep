@@ -162,12 +162,12 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   }
 }
 
-// Contributor role assignment for Web App
+// Key Vault Secrets User role assignment for Web App
 resource keyVaultRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, webApp.id, 'Contributor')
+  name: guid(keyVault.id, webApp.id, 'Key Vault Secrets User')
   scope: keyVault
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b24988ac-6180-42a0-ab88-20f7382dd24c')
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6') // Key Vault Secrets User
     principalId: webApp.identity.principalId
     principalType: 'ServicePrincipal'
   }
