@@ -158,13 +158,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'DIAGNOSTICS_AZUREBLOBCONTAINERSASURL'
-          value: '${storageAccount.properties.primaryEndpoints.blob}crashdumps?${listAccountSas(storageAccount.id, '2023-01-01', {
-            signedProtocol: 'https'
-            signedResourceTypes: 'sco'
-            signedPermission: 'rwdlacup'
-            signedServices: 'b'
-            signedExpiry: '2099-12-31T23:59:59Z'
-          }).accountSasToken}'
+          value: '${storageAccount.properties.primaryEndpoints.blob}crashdumps?${listAccountSas(storageAccount.id, '2023-01-01', {signedProtocol: 'https', signedResourceTypes: 'sco', signedPermission: 'rwdlacup', signedServices: 'b', signedExpiry: '2099-12-31T23:59:59Z'}).accountSasToken}'
         }
         {
           name: 'WEBSITE_CRASHDUMPS_ENABLED'
