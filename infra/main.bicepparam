@@ -7,6 +7,6 @@ param appServicePlanSku = 'S1'
 param dotnetVersion = '8.0'
 param logAnalyticsWorkspaceName = 'log-helloworld'
 param appInsightsName = 'appi-helloworld'
-param storageAccountName = 'sthelloworld'
+// storageAccountName uses default value from main.bicep with uniqueString
 param keyVaultName = 'kv-helloworld-001'
 param secretValue = 'MySecretValue123!'
