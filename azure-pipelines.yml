@@ -1,0 +1,129 @@
+trigger:
+  branches:
+    include:
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  buildConfiguration: 'Release'
+  azureSubscription: 'simple-app-service-connection'
+  resourceGroupName: 'rg-helloworld'
+  location: 'eastus'
+
+stages:
+  - stage: Build
+    displayName: 'Build Application'
+    jobs:
+      - job: Build
+        displayName: 'Build .NET App'
+        steps:
+          - task: UseDotNet@2
+            displayName: 'Use .NET 8.0'
+            inputs:
+              packageType: 'sdk'
+              version: '8.0.x'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore dependencies'
+            inputs:
+              command: 'restore'
+              projects: '**/*.csproj'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Build application'
+            inputs:
+              command: 'build'
+              projects: '**/*.csproj'
+              arguments: '--configuration $(buildConfiguration) --no-restore'
+
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish application'
+            inputs:
+              command: 'publish'
+              publishWebProjects: true
+              arguments: '--configuration $(buildConfiguration) --output $(Build.ArtifactStagingDirectory)'
+              zipAfterPublish: true
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Publish artifacts'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  - stage: DeployInfra
+    displayName: 'Deploy Infrastructure'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: DeployBicep
+        displayName: 'Deploy Bicep Template'
+        steps:
+          - task: AzureCLI@2
+            displayName: 'Create Resource Group'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az group create --name $(resourceGroupName) --location $(location)
+
+          - task: AzureCLI@2
+            displayName: 'Deploy Bicep Template'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az deployment group create \
+                  --resource-group $(resourceGroupName) \
+                  --template-file infra/main.bicep \
+                  --parameters infra/main.bicepparam
+
+          - task: AzureCLI@2
+            displayName: 'Get Web App Name'
+            inputs:
+              azureSubscription: '$(azureSubscription)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                webAppName=$(az deployment group show \
+                  --resource-group $(resourceGroupName) \
+                  --name main \
+                  --query properties.outputs.webAppName.value \
+                  --output tsv)
+                echo "##vso[task.setvariable variable=webAppName;isOutput=true]$webAppName"
+            name: 'GetWebAppName'
+
+  - stage: DeployApp
+    displayName: 'Deploy Application'
+    dependsOn: DeployInfra
+    condition: succeeded()
+    variables:
+      webAppName: $[ stageDependencies.DeployInfra.DeployBicep.outputs['GetWebAppName.webAppName'] ]
+    jobs:
+      - deployment: DeployWebApp
+        displayName: 'Deploy to Azure App Service'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@1
+                  displayName: 'Download artifacts'
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'drop'
+                    downloadPath: '$(System.ArtifactsDirectory)'
+
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Azure Web App'
+                  inputs:
+                    azureSubscription: '$(azureSubscription)'
+                    appType: 'webAppLinux'
+                    appName: '$(webAppName)'
+                    package: '$(System.ArtifactsDirectory)/drop/*.zip'
+                    runtimeStack: 'DOTNETCORE|8.0'
