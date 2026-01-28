@@ -124,6 +124,17 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   }
 }
 
+// Generate SAS token for crash dumps storage
+var sasConfig = {
+  signedProtocol: 'https'
+  signedResourceTypes: 'sco'
+  signedPermission: 'rwdlacup'
+  signedServices: 'b'
+  signedExpiry: '2099-12-31T23:59:59Z'
+}
+var storageSasToken = listAccountSas(storageAccount.id, '2023-01-01', sasConfig).accountSasToken
+var crashDumpsSasUrl = '${storageAccount.properties.primaryEndpoints.blob}crashdumps?${storageSasToken}'
+
 // Web App
 resource webApp 'Microsoft.Web/sites@2023-12-01' = {
   name: webAppName
@@ -158,7 +169,7 @@ resource webApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'DIAGNOSTICS_AZUREBLOBCONTAINERSASURL'
-          value: '${storageAccount.properties.primaryEndpoints.blob}crashdumps?${listAccountSas(storageAccount.id, '2023-01-01', {signedProtocol: 'https', signedResourceTypes: 'sco', signedPermission: 'rwdlacup', signedServices: 'b', signedExpiry: '2099-12-31T23:59:59Z'}).accountSasToken}'
+          value: crashDumpsSasUrl
         }
         {
           name: 'WEBSITE_CRASHDUMPS_ENABLED'
