@@ -62,15 +62,6 @@ stages:
         displayName: 'Deploy Bicep Template'
         steps:
           - task: AzureCLI@2
-            displayName: 'Create Resource Group'
-            inputs:
-              azureSubscription: '$(azureSubscription)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                az group create --name $(resourceGroupName) --location $(location)
-
-          - task: AzureCLI@2
             displayName: 'Deploy Bicep Template'
             inputs:
               azureSubscription: '$(azureSubscription)'
